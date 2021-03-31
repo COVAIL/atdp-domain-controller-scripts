@@ -58,7 +58,7 @@ function Configure-DomainControllerEventFowarding {
   ($security_event_log_sd_policy = Get-GPRegistryValue -Name "$domain_controller_policy_name" -Key "$security_event_log_sd_key" 2>$null) | Out-Null
   if (! $security_event_log_sd_policy) {
     Write-Output "INFO: Configuring WEF Security Event Log SDDC Policy..."
-    $value = 'O:BAG:SYD:(A;;0xf0005;;;SY)(A;;0x5;;;BA)(A;;0x1;;;S-1–5–32–573)(A;;0x1;;;S-1–5–20)'
+    $value = "O:BAG:SYD:(A;;0xf0005;;;SY)(A;;0x5;;;BA)(A;;0x1;;;S-1-5-32-573)(A;;0x1;;;S-1-5-20)"
     ($security_event_log_sd_policy = Set-GPRegistryValue -Name "$domain_controller_policy_name" -Key "$security_event_log_sd_key" -ValueName "ChannelAccess" -Type String -Value "${value}") | Out-Null
   } else {
     Write-Output "INFO: Security log SDDC already set to $($security_event_log_sd_policy.Value)"
