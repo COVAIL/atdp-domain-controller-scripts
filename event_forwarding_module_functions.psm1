@@ -1,4 +1,10 @@
-
+###
+## Copyright © 2021, Columbus Collaboratory LLC d/b/a Covail™ – All Rights Reserved
+## 
+## This code is confidential Covail™ property.  This software and its code
+## may only be used by Covail™ for internal business purposes.
+## For more information consult the Covail™ Master Services Agreement and/or SOW
+## that governed the development of this software and code.
 ###
 ## Module functions for configure_windows_event_formwarding.ps1 script
 ##
