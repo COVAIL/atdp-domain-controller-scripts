@@ -25,62 +25,63 @@ function Configure-DomainControllerEventFowarding {
   $dc_policy = (Get-Gpo -name $domain_controller_policy_name) 2>$null
 
   if (! $dc_policy) {
-    Write-Output "INFO: Policy ${domain_controller_policy_name} does not yet exist, creating new policy..."
-    $Error = $null
+    Write-Host "INFO: Policy ${domain_controller_policy_name} does not yet exist, creating new policy..."
+    # Clear the error variable so we can tell if the next command fails or not.
+    $Error.Clear()
     ($dc_policy = New-Gpo -Name "${domain_controller_policy_name}" -Comment 'Windows Event Forwarding Policy for Domain Controllers for the COVAIL Attack Detector Platform') | Out-Null
-    if ($Error) {
+    if ($Error.Count -gt 0) {
       $m = $Error[-1].Exception.Message
       Write-Error "ERROR: Could not create policy ${domain_controller_policy_name}: ${m}."
       return $false
     }
   }
   else {
-    Write-Output "INFO: Policy ${domain_controller_policy_name} exists!"
+    Write-Host "INFO: Policy ${domain_controller_policy_name} exists!"
   }
 
   ($subscription_manager_policy = Get-GPRegistryValue -Name "$domain_controller_policy_name" -Key "$subscription_manager_policy_key" 2>$null) | Out-Null
 
   $Config = Get-ScriptData
 
-  # $issuer_ca_thumbprint = (Get-ChildItem -Path cert:\LocalMachine\CA | where { $_.Subject -Match "CN=AtdpLab2-Root" } | foreach {$_.Thumbprint.ToLower()})
+  # $issuer_ca_thumbprint = (Get-ChildItem -Path cert:\LocalMachine\CA | Where-Object { $_.Subject -Match "CN=AtdpLab2-Root" } | ForEach-Object {$_.Thumbprint.ToLower()})
   # $domain_name = (Get-WmiObject Win32_ComputerSystem).Domain
 
   if (! $subscription_manager_policy) {
-    Write-Output "INFO: Configuring WEF Subscritpion Manager Policy..."
+    Write-Host "INFO: Configuring WEF Subscritpion Manager Policy..."
     $subscription = "Server=HTTPS://$($Config.WEC_Server_FQDN):5986/wsman/SubscriptionManager/WEC,Refresh=60,IssuerCA=$($Config.Auth_Certificate_Issuer_CA_Thumbprint)"
     Write-Verbose "Subscription: ${subscription}"
     ($subscription_manager_policy = Set-GPRegistryValue -Name "$domain_controller_policy_name" -Key "$subscription_manager_policy_key" -ValueName "1" -Type String -Value "${subscription}") | Out-Null
   } else {
-    Write-Output "INFO: Subscription is currently set to: $($subscription_manager_policy.Value)"
+    Write-Host "INFO: Subscription is currently set to: $($subscription_manager_policy.Value)"
   }
 
   # Configure security descriptor to allow NetworkService access to the Security Event Log
 
   ($security_event_log_sd_policy = Get-GPRegistryValue -Name "$domain_controller_policy_name" -Key "$security_event_log_sd_key" 2>$null) | Out-Null
   if (! $security_event_log_sd_policy) {
-    Write-Output "INFO: Configuring WEF Security Event Log SDDC Policy..."
+    Write-Host "INFO: Configuring WEF Security Event Log SDDC Policy..."
     $value = "O:BAG:SYD:(A;;0xf0005;;;SY)(A;;0x5;;;BA)(A;;0x1;;;S-1-5-32-573)(A;;0x1;;;S-1-5-20)"
     ($security_event_log_sd_policy = Set-GPRegistryValue -Name "$domain_controller_policy_name" -Key "$security_event_log_sd_key" -ValueName "ChannelAccess" -Type String -Value "${value}") | Out-Null
   } else {
-    Write-Output "INFO: Security log SDDC already set to $($security_event_log_sd_policy.Value)"
+    Write-Host "INFO: Security log SDDC already set to $($security_event_log_sd_policy.Value)"
   }
 
   # Ensure GPO is linked to Domain Controllers...
   $ou = "ou=Domain Controllers,dc=$($hostobj.Domain.replace('.',',dc='))"
 
   # Check for link
-  $LinkCount = (((Get-GPInheritance -Target "${ou}").GpoLinks | where { $_.DisplayName -eq "$domain_controller_policy_name" }).Length)
+  $LinkCount = (((Get-GPInheritance -Target "${ou}").GpoLinks | Where-Object { $_.DisplayName -eq "$domain_controller_policy_name" }).Length)
 
   if ($LinkCount -lt 1) {
     try {
-      Write-Output "INFO: linking ${domain_controller_policy_name} to ${ou}..."
+      Write-Host "INFO: linking ${domain_controller_policy_name} to ${ou}..."
       ($link = New-GPLink -Name "$domain_controller_policy_name" -Target "${ou}" -Enforced Yes) | Out-Null
     }
     catch {
       Write-Error "Could not create GPO Link: $_"
     }
   } else {
-    Write-Output "INFO: ${domain_controller_policy_name} is already linked at ${ou}.."
+    Write-Host "INFO: ${domain_controller_policy_name} is already linked at ${ou}.."
   }
 
   return $true
@@ -125,7 +126,7 @@ function Configure-ScriptData {
   # Read in system CA thumbprint(s)
   $Thumbprints = @()
 
-  Get-ChildItem -path cert:\LocalMachine\CA | foreach { $Thumbprints += @{ Subject=$_.Subject; Thumbprint=$_.Thumbprint } }
+  Get-ChildItem -path cert:\LocalMachine\CA | ForEach-Object { $Thumbprints += @{ Subject=$_.Subject; Thumbprint=$_.Thumbprint } }
 
   # Prompt for Issuer Thumbprint
   do {
@@ -162,7 +163,7 @@ function Configure-ScriptData {
   $Config['Auth_Certificate_Issuer_CA_Thumbprint'] = $user_input
   Write-Verbose "Thumbprint = $($Config.Auth_Certificate_Issuer_CA_Thumbprint)"
 
-  echo @"
+  Write-Output @"
 @{
   WEC_Server_FQDN = "$($Config.WEC_Server_FQDN)"
   Auth_Certificate_Issuer_CA_Thumbprint = "$($Config.Auth_Certificate_Issuer_CA_Thumbprint)"
@@ -184,14 +185,14 @@ function Get-WecConfiguration {
       throw "Expected Conditions Not Met"
   }
   
-  $IssuerCert = (Get-ChildItem -Path cert:\LocalMachine\CA | where { $_.Thumbprint -eq "$($Config.Auth_Certificate_Issuer_CA_Thumbprint)"} | Select-Object -First 1)
+  $IssuerCert = (Get-ChildItem -Path cert:\LocalMachine\CA | Where-Object { $_.Thumbprint -eq "$($Config.Auth_Certificate_Issuer_CA_Thumbprint)"} | Select-Object -First 1)
   
   if (!$IssuerCert) {
       Write-Error "Could not find issuer certificate with thumbprint $($Config.Auth_Certificate_Issuer_CA_Thumbprint) in the machine's intermediate CA store, cannot continue."
       throw "Expected Conditions Not Met"
   }
   
-  $AuthCertificate = (Get-ChildItem -Path cert:\LocalMachine\My | where { $_.Subject -Like "CN=$($hostobj.Name).$($hostobj.Domain)" -And $_.Issuer -eq "$($IssuerCert.Subject)" } | Select-Object -First 1)
+  $AuthCertificate = (Get-ChildItem -Path cert:\LocalMachine\My | Where-Object { $_.Subject -Like "CN=$($hostobj.Name).$($hostobj.Domain)" -And $_.Issuer -eq "$($IssuerCert.Subject)" } | Select-Object -First 1)
   
   # Get local config so we can check to make sure settings are as we expect on the client side (certificate auth enabled, etc.)
   #$WinRMConfig = Get-WSManInstance winrm/config
@@ -203,4 +204,45 @@ function Get-WecConfiguration {
   
   Write-Verbose "Checking configuration on $($Config.WEC_Server_FQDN) using certificate $($AuthCertificate.Thumbprint)"
   return (Get-WSManInstance winrm/config -ConnectionURI https://$($Config.WEC_Server_FQDN):5986/WSMAN -Authentication ClientCertificate -CertificateThumbprint $($AuthCertificate.Thumbprint))
+}
+
+function Test-LocalWinRMConfiguration {
+  [CmdletBinding()]
+  [OutputType([Boolean])]
+  param(
+    [switch] $Quiet
+  )
+
+  $WarningCount = 0
+  $ErrorCount = 0
+
+  try {
+    $WinRmConfig = (Get-WSManInstance winrm/config)
+    if (!$WinRmConfig) {
+      throw "Lookup error"
+    }
+
+    if (!$WinRmConfig.Client.Auth.Certificate) {
+      Write-Error "WinRM client configuration does not have ClientCertificate authentication enabled on $($hostobj.Name).$($hostobj.Domain)."
+      $ErrorCount++
+    } else {
+      Write-Verbose "WinRM client configuration has ClientCertificate authentication enabled."
+    }
+
+    ($http_listener = (Get-WSManInstance -ResourceURI winrm/config/listener -SelectorSet @{Address="*";Transport="http"})) 2> $null | Out-Null
+
+    if ($http_listener -and $http_listener.Enabled) {
+      Write-Warning "$($hostobj.Name).$($hostobj.Domain) has an unsecured (HTTP) listener configured and enabled."
+      $WarningCount++
+    } else {
+      Write-Verbose "$($hostobj.Name).$($hostobj.Domain) does not have a WinRM  http listener configured or enabled!  Good!"
+    }
+  
+    if (!$Quiet) { Write-Host "Test concluded. On Host $($hostobj.Name).$($hostobj.Domain) there were $WarningCount warnings and $ErrorCount errors with the WinRM configuration." }
+  } catch {
+    Write-Error "Could not look up winrm configuration on the local server"
+    return $false
+  }
+
+  return $true
 }
