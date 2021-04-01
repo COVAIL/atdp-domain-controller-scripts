@@ -38,11 +38,12 @@ $Cfg.CertificateClients | Foreach-Object {
     Copy-Item -Path $PSScriptRoot\atdp_subscription_data.psd1 -Destination "${remote_module_path}\atdp_subscription_data.psd1"
     $session = New-PSSession -ComputerName $_
     Write-Host "INFO: Running test on host $_..."
-    $verbOut = $PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent
+    $verbOut = if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $true } else { $false }
+    Write-Host "Verbosity enabled: "$verbOut""
     Invoke-Command -Session $session -ScriptBlock {
       Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
       Import-Module -Name (Join-Path "C:\Windows\Temp" event_forwarding_module_functions.psm1) -WarningAction SilentlyContinue
-      if (! (Test-LocalWinRMConfiguration -Verbose:$Using:verbout)) {
+      if (! (Test-LocalWinRMConfiguration -Verbose:$Using:verbOut)) {
         Write-Warning "$Using:_ did not test clean."
       }
       else {
