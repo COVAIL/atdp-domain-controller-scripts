@@ -15,13 +15,13 @@
 $domain_controller_policy_name = "ATDP_WindowsEventForwarding_DomainControllers"
 $subscription_manager_policy_key = "HKLM\Software\Policies\Microsoft\Windows\EventLog\EventForwarding\SubscriptionManager"
 $security_event_log_sd_key = "HKLM\Software\Policies\Microsoft\Windows\EventLog\Security"
+($hostobj = Get-WmiObject -Class Win32_ComputerSystem) 2>$null | out-null
 
 function Configure-DomainControllerEventFowarding {
   [CmdletBinding()]
   [OutputType([Boolean])]
   param()
 
-  ($hostobj = Get-WmiObject -Class Win32_ComputerSystem) 2>$null | out-null
   $dc_policy = (Get-Gpo -name $domain_controller_policy_name) 2>$null
 
   if (! $dc_policy) {
@@ -40,12 +40,7 @@ function Configure-DomainControllerEventFowarding {
 
   ($subscription_manager_policy = Get-GPRegistryValue -Name "$domain_controller_policy_name" -Key "$subscription_manager_policy_key" 2>$null) | Out-Null
 
-  if (! ((Test-Path -Path $PSScriptRoot\atdp_subscription_data.psd1) 2>$null) -eq $true) {
-    Write-Warning "WARN: No susbscription configuration data exists, please follow the prompts to provide the required information..."
-    $null = Configure-ScriptData
-  }
-
-  $Config = Import-PowerShellDataFile $PSScriptRoot\atdp_subscription_data.psd1
+  $Config = Get-ScriptData
 
   # $issuer_ca_thumbprint = (Get-ChildItem -Path cert:\LocalMachine\CA | where { $_.Subject -Match "CN=AtdpLab2-Root" } | foreach {$_.Thumbprint.ToLower()})
   # $domain_name = (Get-WmiObject Win32_ComputerSystem).Domain
@@ -89,6 +84,17 @@ function Configure-DomainControllerEventFowarding {
   }
 
   return $true
+}
+
+
+function Get-ScriptData {
+  if (! ((Test-Path -Path $PSScriptRoot\atdp_subscription_data.psd1) 2>$null) -eq $true) {
+    Write-Warning "WARN: No susbscription configuration data exists, please follow the prompts to provide the required information..."
+    $null = Configure-ScriptData
+  }
+
+  $Config = Import-PowerShellDataFile $PSScriptRoot\atdp_subscription_data.psd1
+  return $Config
 }
 
 function Configure-ScriptData {
@@ -164,4 +170,37 @@ function Configure-ScriptData {
 "@ | Out-File $PSScriptRoot\atdp_subscription_data.psd1 -Encoding utf8 -Force
 
   return $true
+}
+
+function Get-WecConfiguration {
+  [CmdletBinding()]
+  [OutputType([Object])]
+  param()
+
+  $Config = Get-ScriptData
+  
+  if (!$Config.Auth_Certificate_Issuer_CA_Thumbprint) {
+      Write-Error "Issuer thumbprint configuration not found, cannot continue."
+      throw "Expected Conditions Not Met"
+  }
+  
+  $IssuerCert = (Get-ChildItem -Path cert:\LocalMachine\CA | where { $_.Thumbprint -eq "$($Config.Auth_Certificate_Issuer_CA_Thumbprint)"} | Select-Object -First 1)
+  
+  if (!$IssuerCert) {
+      Write-Error "Could not find issuer certificate with thumbprint $($Config.Auth_Certificate_Issuer_CA_Thumbprint) in the machine's intermediate CA store, cannot continue."
+      throw "Expected Conditions Not Met"
+  }
+  
+  $AuthCertificate = (Get-ChildItem -Path cert:\LocalMachine\My | where { $_.Subject -Like "CN=$($hostobj.Name).$($hostobj.Domain)" -And $_.Issuer -eq "$($IssuerCert.Subject)" } | Select-Object -First 1)
+  
+  # Get local config so we can check to make sure settings are as we expect on the client side (certificate auth enabled, etc.)
+  #$WinRMConfig = Get-WSManInstance winrm/config
+  
+  if (!$Config.WEC_Server_FQDN) {
+      Write-Error "WEC hostname not configured, cannot continue."
+      throw "Expected Conditions Not Met"
+  }
+  
+  Write-Verbose "Checking configuration on $($Config.WEC_Server_FQDN) using certificate $($AuthCertificate.Thumbprint)"
+  return (Get-WSManInstance winrm/config -ConnectionURI https://$($Config.WEC_Server_FQDN):5986/WSMAN -Authentication ClientCertificate -CertificateThumbprint $($AuthCertificate.Thumbprint))
 }
