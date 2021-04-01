@@ -217,25 +217,45 @@ function Test-LocalWinRMConfiguration {
   $ErrorCount = 0
 
   try {
-    $WinRmConfig = (Get-WSManInstance winrm/config)
-    if (!$WinRmConfig) {
-      throw "Lookup error"
-    }
+    $WinRmService = (Get-Service winrm 2>$null)
 
-    if (!$WinRmConfig.Client.Auth.Certificate) {
-      Write-Error "WinRM client configuration does not have ClientCertificate authentication enabled on $($hostobj.Name).$($hostobj.Domain)."
+    if (!$WinRmService) {
+      Write-Error "WinRM service doesn't exist"
       $ErrorCount++
     } else {
-      Write-Verbose "WinRM client configuration has ClientCertificate authentication enabled."
+      Write-Verbose "WinRM Service exists"
     }
 
-    ($http_listener = (Get-WSManInstance -ResourceURI winrm/config/listener -SelectorSet @{Address="*";Transport="http"})) 2> $null | Out-Null
-
-    if ($http_listener -and $http_listener.Enabled) {
-      Write-Warning "$($hostobj.Name).$($hostobj.Domain) has an unsecured (HTTP) listener configured and enabled."
-      $WarningCount++
+    if (! ($WinRmService.Status -eq "Running")) {
+      Write-Error "WinRM service is not running"
+      $ErrorCount++
     } else {
-      Write-Verbose "$($hostobj.Name).$($hostobj.Domain) does not have a WinRM  http listener configured or enabled!  Good!"
+      Write-Verbose "WinRM Service is running"
+    }
+
+    $WinRmConfig = (Get-WSManInstance winrm/config)
+
+    if (!$WinRmConfig) {
+      Write-Error "Could not look up WinRM configuration"
+      $ErrorCount++
+    }
+    else {
+      Write-Verbose "WinRM configuration lookup succeeded."
+      if (!$WinRmConfig.Client.Auth.Certificate) {
+        Write-Error "WinRM client configuration does not have ClientCertificate authentication enabled on $($hostobj.Name).$($hostobj.Domain)."
+        $ErrorCount++
+      } else {
+        Write-Verbose "WinRM client configuration has ClientCertificate authentication enabled."
+      }
+
+      ($http_listener = (Get-WSManInstance -ResourceURI winrm/config/listener -SelectorSet @{Address="*";Transport="http"})) 2> $null | Out-Null
+
+      if ($http_listener -and $http_listener.Enabled) {
+        Write-Warning "$($hostobj.Name).$($hostobj.Domain) has an unsecured (HTTP) listener configured and enabled."
+        $WarningCount++
+      } else {
+        Write-Verbose "$($hostobj.Name).$($hostobj.Domain) does not have a WinRM  http listener configured or enabled!  Good!"
+      }
     }
   
     if (!$Quiet) { Write-Host "Test concluded. On Host $($hostobj.Name).$($hostobj.Domain) there were $WarningCount warnings and $ErrorCount errors with the WinRM configuration." }
