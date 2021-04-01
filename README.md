@@ -13,3 +13,4 @@
 
 * `event_forwarding_module_functions.psm1` - function definitions for event forwarding module
 * `configure_windows_event_forwarding.ps1` - wrapper script to configure windows event forwarding GPO for domain controllers
+* `test_wec_connectivty.ps1` - script to test WEC connectivity (with certificate authentication) after certificates are configured.
