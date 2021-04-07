@@ -110,7 +110,12 @@ function Configure-ScriptData {
   [OutputType([Boolean])]
   param()
 
-  $Config = Get-ScriptData
+  if ((Get-Host).Version.Major -lt 5) {
+    Import-LocalizedData -BindingVariable Config -BaseDirectory $PSScriptRoot -FileName atdp_subscription_data.psd1
+  } 
+  else {
+    $Config = Import-PowerShellDataFile $PSScriptRoot\atdp_subscription_data.psd1
+  }
   
   if (! $Config) {
     $Config = @{}
