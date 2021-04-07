@@ -50,6 +50,7 @@ $Cfg.CertificateClients | Foreach-Object {
     Write-Host "INFO: Testing for file share enabled on $_..."
     if (! (Test-Path -Path "${remote_module_path}" 2>$null)) {
       Write-Warning "Cannot access $(${remote_module_path}) on $_, cannot continue on this host. FAILURE on $_"
+      Write-Warning "Please enable windows firewall 'File and Printer Sharing' on the Domain profile to enable file copy and try again."
       continue
     }
     Write-Host "INFO: Copying script modules to host $_ at $(${remote_module_path})..."
