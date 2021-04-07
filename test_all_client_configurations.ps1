@@ -47,8 +47,15 @@ $Cfg.CertificateClients | Foreach-Object {
   try {
     $Error.clear()
     $remote_module_path = "\\$_\c$\Windows\Temp"
+    Write-Host "INFO: Testing for file share enabled on $_..."
+    if (! (Test-Path -Path "${remote_module_path}" 2>$null)) {
+      Write-Warning "Cannot access $(${remote_module_path}) on $_, cannot continue on this host. FAILURE on $_"
+      continue
+    }
+    Write-Host "INFO: Copying script modules to host $_ at $(${remote_module_path})..."
     Copy-Item -Path $PSScriptRoot\event_forwarding_module_functions.psm1 -Destination "${remote_module_path}\event_forwarding_module_functions.psm1"
     Copy-Item -Path $PSScriptRoot\atdp_subscription_data.psd1 -Destination "${remote_module_path}\atdp_subscription_data.psd1"
+    Write-Host "INFO: Creating session to host $_..."
     $session = New-PSSession -ComputerName $_
     Write-Host "INFO: Running test on host $_..."
     $verbOut = if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $true } else { $false }
