@@ -31,10 +31,10 @@ if (!$Cfg -or !$Cfg.CertificateClients) {
 Write-Verbose "Configuration found!"
 
 if ((Get-Host).Version.Major -lt 5) {
-  Import-LocalizedData -BindingVariable config -BaseDirectory $PSScriptRoot -FileName atdp_subscription_data.psd1
+  Import-LocalizedData -BindingVariable config -BaseDirectory $PSScriptRoot -FileName atdp_subscription_data.psd1 2>$null
 } 
 else {
-  $config = Import-PowerShellDataFile $PSScriptRoot\atdp_subscription_data.psd1
+  $config = Import-PowerShellDataFile $PSScriptRoot\atdp_subscription_data.psd1 2>$null
 }
 
 if (!$config -or !$config.WEC_Server_FQDN -or !$config.Auth_Certificate_Issuer_CA_Thumbprint) {
