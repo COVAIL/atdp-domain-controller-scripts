@@ -20,13 +20,21 @@
 ##    respectively
 ###
 
+#Requires -Version 4.0
+
 # Check for the client list configuration
 if (! (Test-Path -Path $PSScriptRoot\cert_gen_config.psd1)) {
   Write-Error "ERROR: there is no cert_gen_config.psd1 file listing the computers to generate certificare requests for."
   exit 1
 }
 
-$Config = Import-PowerShellDataFile $PSScriptRoot\cert_gen_config.psd1
+if ((Get-Host).Version.Major -lt 5) {
+  Import-LocalizedData -BindingVariable Config -BaseDirectory $PSScriptRoot -FileName cert_gen_config.psd1
+} 
+else {
+  $Config = Import-PowerShellDataFile $PSScriptRoot\cert_gen_config.psd1
+}
+
 $upath = "Windows\Temp"
 ($hostobj = Get-WmiObject -Class Win32_ComputerSystem) 2>$null | out-null
 

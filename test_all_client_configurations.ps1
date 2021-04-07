@@ -12,17 +12,30 @@
 ## Date: 2021-03-26
 ###
 
+#Requires -Version 4.0
+
 [CmdletBinding()]
 param()
 
-$Cfg = Import-PowerShellDataFile -Path $PSScriptRoot\cert_gen_config.psd1
+if ((Get-Host).Version.Major -lt 5) {
+  Import-LocalizedData -BindingVariable Cfg -BaseDirectory $PSScriptRoot -FileName cert_gen_config.psd1
+} 
+else {
+  $Cfg = Import-PowerShellDataFile $PSScriptRoot\cert_gen_config.psd1
+}
 
 if (!$Cfg -or !$Cfg.CertificateClients) {
   throw "Configuration not found!"
 }
 
 Write-Verbose "Configuration found!"
-$config = Import-PowerShellDataFile $PSScriptRoot\atdp_subscription_data.psd1
+
+if ((Get-Host).Version.Major -lt 5) {
+  Import-LocalizedData -BindingVariable config -BaseDirectory $PSScriptRoot -FileName atdp_subscription_data.psd1
+} 
+else {
+  $config = Import-PowerShellDataFile $PSScriptRoot\atdp_subscription_data.psd1
+}
 
 if (!$config -or !$config.WEC_Server_FQDN -or !$config.Auth_Certificate_Issuer_CA_Thumbprint) {
   Import-Module -Name (Join-Path $PSScriptRoot event_forwarding_module_functions.psm1 -Resolve) -WarningAction SilentlyContinue

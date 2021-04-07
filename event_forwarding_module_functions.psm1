@@ -12,6 +12,8 @@
 ## Date: 2021-03-26
 ###
 
+#Requires -Version 4.0
+
 $domain_controller_policy_name = "ATDP_WindowsEventForwarding_DomainControllers"
 $subscription_manager_policy_key = "HKLM\Software\Policies\Microsoft\Windows\EventLog\EventForwarding\SubscriptionManager"
 $security_event_log_sd_key = "HKLM\Software\Policies\Microsoft\Windows\EventLog\Security"
@@ -94,7 +96,12 @@ function Get-ScriptData {
     $null = Configure-ScriptData
   }
 
-  $Config = Import-PowerShellDataFile $PSScriptRoot\atdp_subscription_data.psd1
+  if ((Get-Host).Version.Major -lt 5) {
+    Import-LocalizedData -BindingVariable Config -BaseDirectory $PSScriptRoot -FileName atdp_subscription_data.psd1
+  } 
+  else {
+    $Config = Import-PowerShellDataFile $PSScriptRoot\atdp_subscription_data.psd1
+  }
   return $Config
 }
 
@@ -103,10 +110,8 @@ function Configure-ScriptData {
   [OutputType([Boolean])]
   param()
 
-  if (((Test-Path -Path $PSScriptRoot\atdp_subscription_data.psd1) 2>$null) -eq $true) {
-    $Config = Import-PowerShellDataFile $PSScriptRoot\atdp_subscription_data.psd1
-  }
-
+  $Config = Get-ScriptData
+  
   if (! $Config) {
     $Config = @{}
   }

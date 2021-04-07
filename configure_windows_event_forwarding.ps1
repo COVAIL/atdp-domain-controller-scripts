@@ -12,6 +12,8 @@
 ## Date: 2021-03-26
 ###
 
+#Requires -Version 4.0
+
 [CmdletBinding()]
 param()
 

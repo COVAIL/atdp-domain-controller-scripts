@@ -12,6 +12,8 @@
 ## Date: 2021-02-15
 ###
 
+#Requires -Version 4.0
+
 # Check for HOSTNAME Variable
 ($hostobj = Get-WmiObject -Class Win32_ComputerSystem) 2>$null | out-null
 

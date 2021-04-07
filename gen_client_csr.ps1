@@ -12,6 +12,8 @@
 ## Date: 2021-02-15
 ###
 
+#Requires -Version 4.0
+
 # Check for HOSTNAME Variable
 ($hostobj = Get-WmiObject -Class Win32_ComputerSystem) 2>$null | out-null
 
@@ -53,7 +55,7 @@ SecurityDescriptor = "D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GR;;;NS)"
 "@
 
 # Write out the request .inf file
-echo "$request_string" | Out-File -FilePath "$req_file.inf"
+Write-Output "$request_string" | Out-File -FilePath "$req_file.inf"
 
 Write-Host "INFO: Generating certificate request from $req_file.inf and saving the result in $req_file"
 

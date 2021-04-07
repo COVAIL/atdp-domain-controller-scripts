@@ -10,6 +10,8 @@
 # Date: 2021-03-31
 ###
 
+#Requires -Version 4.0
+
 # SET THE ARGUMENTS
 $principal = Get-ADDomain | select -ExpandProperty distinguishedname
 $flags = 'Success','Failure';
