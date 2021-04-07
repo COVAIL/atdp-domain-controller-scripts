@@ -59,7 +59,7 @@ $Cfg.CertificateClients | Foreach-Object {
     $session = New-PSSession -ComputerName $_
     Write-Host "INFO: Running test on host $_..."
     $verbOut = if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) { $true } else { $false }
-    Write-Host "Verbosity enabled: "$verbOut""
+    # Write-Host "Verbosity enabled: "$verbOut""
     Invoke-Command -Session $session -ScriptBlock {
       Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
       Import-Module -Name (Join-Path "C:\Windows\Temp" event_forwarding_module_functions.psm1) -WarningAction SilentlyContinue
