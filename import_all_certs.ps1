@@ -83,3 +83,22 @@ foreach ($Computer in $Config.CertificateClients) {
     Write-Warning "ERROR: No $certPath found"
   }
 }
+
+($share = Get-SmbShare -Name "certs") | Out-Null
+
+if ($share) {
+  $answer = $null
+  do {
+    # Ask the user if they would like to remove the "certs" share now...
+    $answer = Read-Host -Prompt "Would you like to remove the 'certs' share? (yes/no)"
+    if ($answer) {
+      if ($answer.ToUpper() -eq "Y" -or $answer.ToUpper() -eq "YES") {
+        Write-Host "INFO: removing 'certs' share..."
+        Remove-SmbShare -Name "certs" -Force
+      }
+      else {
+        Write-Host "Ok, the 'certs' share will be left. Please remove the share when you are finished configuring certificates."
+      }
+    }
+  } while (! $answer)
+}
