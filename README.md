@@ -16,5 +16,6 @@ NOTE: when using these scripts, the administrator should first configure the `ce
 * `event_forwarding_module_functions.psm1` - function definitions for event forwarding module
 * `configure_windows_event_forwarding.ps1` - wrapper script to configure windows event forwarding GPO for domain controllers
 * `test_wec_connectivty.ps1` - script to test WEC connectivity (with certificate authentication) after certificates are configured.
+* `test_all_client_configurations.ps1` - test WEC configuration and connectivity (with certificate auth) on all hosts configured in the `cert_get_config.psd1` file; also requires an `atdp_subscription_data.psd1` configuration file to define the wec hostname and issuer CA thumbprint. Should be run with the `-Verbose` argument to ensure the best detail.
 
 NOTE: running either `configure_windows_event_forwarding.ps1` or `test_wec_connectivity.ps1` will force the user to configure the WEC and Issuer CA if no confiruation file is present.
