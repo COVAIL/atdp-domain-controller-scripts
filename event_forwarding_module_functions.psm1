@@ -9,7 +9,7 @@
 ## Module functions for configure_windows_event_formwarding.ps1 script
 ##
 ## Author: kmontgomery@covail.com
-## Date: 2021-03-26
+## Date: 2021-06-18
 ###
 
 #Requires -Version 4.0
@@ -18,6 +18,68 @@ $domain_controller_policy_name = "ATDP_WindowsEventForwarding_DomainControllers"
 $subscription_manager_policy_key = "HKLM\Software\Policies\Microsoft\Windows\EventLog\EventForwarding\SubscriptionManager"
 $security_event_log_sd_key = "HKLM\Software\Policies\Microsoft\Windows\EventLog\Security"
 ($hostobj = Get-WmiObject -Class Win32_ComputerSystem) 2>$null | out-null
+
+# Test-SslProtocol function Stolen from https://gist.github.com/PlagueHO/e63cb51d0c38fcb18b7c0d638fa7e81b
+function Test-SslProtocol {
+  param(
+    [Parameter(Mandatory=$true,ValueFromPipelineByPropertyName=$true,ValueFromPipeline=$true)]
+    $ComputerName,
+
+    [Parameter(ValueFromPipelineByPropertyName=$true)]
+    [int]$Port = 443,
+
+    [Parameter(ValueFromPipelineByPropertyName=$true)]
+    [System.Security.Cryptography.X509Certificates.X509Certificate]$ClientCert = $null
+  )
+  begin {
+    $ProtocolNames = [System.Security.Authentication.SslProtocols] |
+      Get-Member -Static -MemberType Property |
+      Where-Object -Filter { $_.Name -notin @("Default","None") } |
+      Foreach-Object { $_.Name }
+  }
+  process {
+    $ProtocolStatus = [Ordered]@{}
+    $ProtocolStatus.Add("ComputerName", $ComputerName)
+    $ProtocolStatus.Add("Port", $Port)
+    $ProtocolStatus.Add("KeyLength", $null)
+    $ProtocolStatus.Add("SignatureAlgorithm", $null)
+
+    $ProtocolNames | %{
+      $ProtocolName = $_
+      $Socket = New-Object System.Net.Sockets.Socket( `
+          [System.Net.Sockets.SocketType]::Stream,
+          [System.Net.Sockets.ProtocolType]::Tcp)
+      try {
+        $Socket.Connect($ComputerName, $Port)
+        try {
+            $CertCollection = $null
+            if ($ClientCert) {
+              $CertCollection = New-Object System.Security.Cryptography.X509Certificates.X509CertificateCollection
+              $CertCollection.Add($ClientCert)
+            }
+            $NetStream = New-Object System.Net.Sockets.NetworkStream($Socket, $true)
+            $SslStream = New-Object System.Net.Security.SslStream($NetStream, $true)
+            $SslStream.AuthenticateAsClient($ComputerName, $CertCollection, $ProtocolName, $false )
+            $RemoteCertificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]$SslStream.RemoteCertificate
+            $ProtocolStatus["KeyLength"] = $RemoteCertificate.PublicKey.Key.KeySize
+            $ProtocolStatus["SignatureAlgorithm"] = $RemoteCertificate.SignatureAlgorithm.FriendlyName
+            $ProtocolStatus["Certificate"] = $RemoteCertificate
+            $ProtocolStatus["IsMutuallyAuthenticated"] = $SslStream.IsMutuallyAuthenticated
+            $ProtocolStatus["IsAuthenticated "] = $SslStream.IsAuthenticated 
+            $ProtocolStatus.Add($ProtocolName, $true)
+        } catch  {
+            $ProtocolStatus.Add($ProtocolName, $false)
+        } finally {
+            if ($SslStream) { $SslStream.Close() }
+        }
+      } catch {
+        throw "Could not connect to $($ComputerName):$($Port)."
+      }
+    }
+    [PSCustomObject]$ProtocolStatus
+  }
+} # function Test-SslProtocol
+
 
 function Configure-DomainControllerEventFowarding {
   [CmdletBinding()]
@@ -189,30 +251,56 @@ function Get-WecConfiguration {
   param()
 
   $Config = Get-ScriptData
-  
+
   if (!$Config.Auth_Certificate_Issuer_CA_Thumbprint) {
       Write-Error "Issuer thumbprint configuration not found, cannot continue."
       throw "Expected Conditions Not Met"
   }
-  
+
   $IssuerCert = (Get-ChildItem -Path cert:\LocalMachine\CA | Where-Object { $_.Thumbprint -eq "$($Config.Auth_Certificate_Issuer_CA_Thumbprint)"} | Select-Object -First 1)
-  
+
   if (!$IssuerCert) {
       Write-Error "Could not find issuer certificate with thumbprint $($Config.Auth_Certificate_Issuer_CA_Thumbprint) in the machine's intermediate CA store, cannot continue."
       throw "Expected Conditions Not Met"
   }
-  
+
+  Write-Verbose "Found issuer certificate in the CA certificate store for $($hostobj.Name).$($hostobj.Domain)."
+
   $AuthCertificate = (Get-ChildItem -Path cert:\LocalMachine\My | Where-Object { $_.Subject -Like "CN=$($hostobj.Name).$($hostobj.Domain)" -And $_.Issuer -eq "$($IssuerCert.Subject)" } | Select-Object -First 1)
-  
-  # Get local config so we can check to make sure settings are as we expect on the client side (certificate auth enabled, etc.)
-  #$WinRMConfig = Get-WSManInstance winrm/config
-  
+
+  if (!$AuthCertificate) {
+    Write-Error "Could not find a client certificate for the hostname that matches the expected issuer subject."
+    throw "Expected Conditions Not Met"
+  }
+
+  Write-Verbose "Client authentication certificate for $($hostobj.Name).$($hostobj.Domain) was found in the machine certificate store of type $($AuthCertificate.GetType())."
+
   if (!$Config.WEC_Server_FQDN) {
       Write-Error "WEC hostname not configured, cannot continue."
       throw "Expected Conditions Not Met"
   }
-  
-  Write-Verbose "Checking configuration on $($Config.WEC_Server_FQDN) using certificate $($AuthCertificate.Thumbprint)"
+
+  $TcpTest = (Test-NetConnection $($Config.WEC_Server_FQDN) -Port 5986 -InformationLevel "Detailed")
+
+  if (!$TcpTest -or !$TcpTest.TcpTestSucceeded) {
+    Write-Error "Could not connect to $($Config.WEC_Server_FQDN):5986, cannot continue."
+    throw "Expected Conditions Not Met"
+  }
+
+  Write-Verbose "TCP Connection to $($Config.WEC_Server_FQDN):5986 was successful from $($hostobj.Name).$($hostobj.Domain) succeeded."
+
+  $SslTest = (Test-SslProtocol -ComputerName $($Config.WEC_Server_FQDN) -Port 5986 -ClientCert $AuthCertificate)
+
+  if (!$SslTest) {
+    Write-Error "Could not SSL connect to $($Config.WEC_Server_FQDN):5986, cannot continue."
+    throw "Expected Conditions Not Met"
+  }
+
+  if (!$SslTest.IsMutuallyAuthenticated) {
+    Write-Warning "Certificate authentication did not succeed, but that is probably ok; we're not hitting an exact endpoint that requries it with the SSL test."
+  }
+
+  Write-Verbose "SSL Check succeeded, checking configuration on $($Config.WEC_Server_FQDN) using certificate $($AuthCertificate.Thumbprint)"
   return (Get-WSManInstance winrm/config -ConnectionURI https://$($Config.WEC_Server_FQDN):5986/WSMAN -Authentication ClientCertificate -CertificateThumbprint $($AuthCertificate.Thumbprint))
 }
 
@@ -227,18 +315,18 @@ function Test-LocalWinRMConfiguration {
   $ErrorCount = 0
 
   try {
-    $WinRmService = (Get-Service winrm 2>$null)
+    $WinRmService = (Get-Service winrm -ErrorAction SilentlyContinue 2>$null)
 
     if (!$WinRmService) {
-      Write-Error "WinRM service doesn't exist"
-      $ErrorCount++
+      Write-Warning "WinRM service doesn't exist"
+      $WarningCount++
     } else {
       Write-Verbose "WinRM Service exists"
     }
 
     if (! ($WinRmService.Status -eq "Running")) {
-      Write-Error "WinRM service is not running"
-      $ErrorCount++
+      Write-Warning "WinRM service is not running"
+      $WarningCount++
     } else {
       Write-Verbose "WinRM Service is running"
     }
