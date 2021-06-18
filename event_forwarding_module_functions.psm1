@@ -275,6 +275,20 @@ function Get-WecConfiguration {
 
   Write-Verbose "Client authentication certificate for $($hostobj.Name).$($hostobj.Domain) was found in the machine certificate store of type $($AuthCertificate.GetType())."
 
+  # Check To Make Sure NETWORK SERVICE has read access to the private key for the Auth Cert...
+  $AuthCertKeyName = $AuthCertificate.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName
+  $MachineKeys = Get-ChildItem -Path C:\ProgramData\Microsoft\Crypto\RSA\MachineKeys
+  $aces = $MachineKeys | Where-Object Name -Match $AuthCertKeyName | Get-Acl | Select-Object -ExpandProperty Access
+  $net_ser_aces = $aces | Where-Object {($_.IdentityReference -like '*NETWORK SERVICE') -and ($_.FileSystemRights -like '*Read*') -and ($_.AccessControlType -eq 'Allow')}
+  $ns_ace_exists = $net_ser_aces.Length -gt 0
+
+  if (!$ns_ace_exists) {
+    Write-Error "NETWORK SERVICE account on $($hostobj.Name).$($hostobj.Domain) does not have read access to the $($AuthCertificate.Subject) certificate's private key."
+    throw "Expected Conditions Not Met"
+  }
+
+  Write-Verbose "NETWORK SERVICE account on $($hostobj.Name).$($hostobj.Domain) has read access to the $($AuthCertificate.Subject) certificate's private key."
+
   if (!$Config.WEC_Server_FQDN) {
       Write-Error "WEC hostname not configured, cannot continue."
       throw "Expected Conditions Not Met"
