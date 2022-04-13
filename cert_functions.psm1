@@ -43,7 +43,7 @@ function Get-DomainControllers {
   }
 
   $DomainName = (Get-ADDomain).DNSRoot
-  $DCList = Get-ADDomainController -Filter * -Server $DomainName | Select -ExpandProperty Hostname
+  $DCList = Get-ADDomainController -Filter * -Server $DomainName | Select-Object -ExpandProperty Hostname
   if (!$NoCache -And $DCList.Length -gt 0) {
     Write-Verbose "INFO: Caching results..."
     $CachedDCList = $DCList;

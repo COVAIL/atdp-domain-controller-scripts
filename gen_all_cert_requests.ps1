@@ -1,32 +1,35 @@
 ###
-## Copyright © 2021, Columbus Collaboratory LLC d/b/a Covail™ – All Rights Reserved
+## Copyright © 2022, GoSecure, Inc. – All Rights Reserved
 ## 
-## This code is confidential Covail™ property.  This software and its code
-## may only be used by Covail™ for internal business purposes.
-## For more information consult the Covail™ Master Services Agreement and/or SOW
+## This code is confidential GoSecure, Inc. property.  This software and its code
+## may only be used by GoSecure, Inc. for internal business purposes.
+## For more information consult the GoSecure, Inc. Master Services Agreement and/or SOW
 ## that governed the development of this software and code.
 ###
 ## Create Client Certificate Requests for a Configured List of Clients
 ##
-## Author: kmontgomery@covail.com
-## Date: 2021-02-15
+## Author: kmontgomery@gosecure.net
+## Date: 2022-04-13
 ###
 
 ###
 ## Prerequisites:
-## 1) cert_gen_config.psd1 file in the directory this script runs from, listing the computers to generate certs for
-##    and a list of users to give permissions to the certs share (could just be your user)
-## 2) permissions by the user running this script to create a C:\certs directory on the windows server it is run from
+## 1) permissions by the user running this script to create a C:\certs directory on the windows server it is run from
 ##    and add share permissions to it; this share will be used to copy cert requests and certificates back and forth
 ##    to the client certificate target systems (should run this script using an elevated permission shell)
+## 2) cert_gen_config.psd1 file in the directory this script runs from, listing the computers to generate certs for
+##    and a list of users to give permissions to the certs share (could just be your user); NOTE: as of 2022-04, the
+##    script will generate this configuration
 ###
 
 #Requires -Version 4.0
+#Requires -Modules ActiveDirectory
 
 # Check for the client list configuration
 if (! (Test-Path -Path $PSScriptRoot\cert_gen_config.psd1)) {
-  Write-Error "ERROR: there is no cert_gen_config.psd1 file listing the computers to generate certificare requests for."
-  exit 1
+  Import-Module -Name (Join-Path $PSScriptRoot cert_functions.psm1 -Resolve) -WarningAction SilentlyContinue
+  Write-Host "INFO: There is no configuration file, building a default configuration with domain controllers as the target systems for certificate generation."
+  New-CertGenConfig -Verbose:($PSBoundParameters['Verbose'] -eq $true) -Overwrite $false
 }
 
 if ((Get-Host).Version.Major -lt 5) {
@@ -47,12 +50,14 @@ if (! (Test-Path -Path $PSScriptRoot\gen_client_csr.ps1 -PathType leaf)) {
 # On the computer that is running this script, create a "certs" directory and share
 # to be the location to copy requests and certificates to and from
 if (! (Test-Path -Path C:\certs)) {
+  [SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', Scope='member')]
   $certdir = New-Item -Path C:\ -Name "certs" -ItemType "directory"
 }
+
 if (! (Get-SmbShare -Name "certs") 2>$null) {
     Write-Host "INFO: Configurinng certs share with access for $($Config.CertsShareUsers)..."
     $newShare = New-SmbShare -Name "certs" -Path "C:\certs" -FullAccess $($Config.CertsShareUsers)
-    if ($newShare -eq $null) {
+    if ($null -eq $newShare) {
       Write-Error "ERROR: Could not create certs share"
       exit 2
     }
@@ -64,7 +69,7 @@ foreach ($Computer in $Config.CertificateClients) {
   try {
     if (! (Test-Path -Path "\\$Computer\c$\$upath\certreq")) {
       $crPath = New-Item -Path \\$Computer\c$\$upath -Name "certreq" -ItemType "directory"
-      if ($crPath -eq $null) {
+      if ($null -eq $crPath) {
         Write-Error "ERROR: could not create certreq directory on $Computer; skipping..."
         continue
       }
