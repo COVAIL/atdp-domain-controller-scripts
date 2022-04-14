@@ -107,7 +107,7 @@ function New-CertGenConfig {
   Write-Output @"
 @{
   CertificateClients = @($CertClients)
-  CertShareUsers = @($ShareUsers)
+  CertsShareUsers = @($ShareUsers)
 }
 "@ | Out-File $ConfigFullPath -Encoding utf8 -Force    
 }
