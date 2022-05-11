@@ -17,13 +17,13 @@ $principal = Get-ADDomain | select -ExpandProperty distinguishedname
 $flags = 'Success','Failure';
 $AuditGroup =  'Domain Users' # THIS ARGUMENT CAN BE CHANGED TO 'Guest' SO THAT ACEs ARE WRITTEN BUT NOT APPLIED
 $remove = $false # Set this to $true to remove previously configured ACEs, rather than set them
-$acl = Get-Acl -Path AD:$principal -Audit;
+$acl = Get-Acl -Path AD:\$principal -Audit;
  
 # REMOVE ALL AUDIT SACLS FROM DOMAIN!!!!!
 # THIS CANNOT BE UNDONE
 # $acl.GetAuditRules($True, $False, [System.Security.Principal.SecurityIdentifier]) | Foreach-Object { $acl.RemoveAuditRule($_); }
-# Set-Acl -Path AD:$principal $acl
-# $acl = Get-Acl -Path AD:$principal -Audit;
+# Set-Acl -Path AD:\$principal $acl
+# $acl = Get-Acl -Path AD:\$principal -Audit;
  
 # SETTING SACLS FOR DCSYNC REPLICATION EXTENDED RIGHTS
 $adright = 'ExtendedRight'
@@ -45,7 +45,7 @@ foreach($rightguid in $rights_guids){
     } else {
         $acl.AddAuditRule($ace)
     }
-    Set-Acl -Path AD:$principal -AclObject $acl;
+    Set-Acl -Path AD:\$principal -AclObject $acl;
 }
   
 # Property GUIDs
@@ -90,7 +90,7 @@ foreach($property_guid in $properties){
     } else {
         $acl.AddAuditRule($ace)
     }
-    Set-Acl -Path AD:$principal -AclObject $acl;
+    Set-Acl -Path AD:\$principal -AclObject $acl;
 }
  
 # Set SACLs for computers
@@ -108,7 +108,7 @@ foreach($property_guid in $properties){
     } else {
         $acl.AddAuditRule($ace)
     }
-    Set-Acl -Path AD:$principal -AclObject $acl;
+    Set-Acl -Path AD:\$principal -AclObject $acl;
 }
  
 # Set SACLs for ou
@@ -126,7 +126,7 @@ foreach($property_guid in $properties){
     } else {
         $acl.AddAuditRule($ace)
     }
-    Set-Acl -Path AD:$principal -AclObject $acl;
+    Set-Acl -Path AD:\$principal -AclObject $acl;
 }
  
 # Set SACLs for groups
@@ -144,7 +144,7 @@ foreach($property_guid in $properties){
     } else {
         $acl.AddAuditRule($ace)
     }
-    Set-Acl -Path AD:$principal -AclObject $acl;
+    Set-Acl -Path AD:\$principal -AclObject $acl;
 }
  
 # Set SACLs for trust
@@ -162,7 +162,7 @@ foreach($property_guid in $properties){
     } else {
         $acl.AddAuditRule($ace)
     }
-    Set-Acl -Path AD:$principal -AclObject $acl;
+    Set-Acl -Path AD:\$principal -AclObject $acl;
 }
  
 # Set SACLs for gpo
@@ -180,5 +180,5 @@ foreach($property_guid in $properties){
     } else {
         $acl.AddAuditRule($ace)
     }
-    Set-Acl -Path AD:$principal -AclObject $acl;
+    Set-Acl -Path AD:\$principal -AclObject $acl;
 }

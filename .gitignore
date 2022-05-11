@@ -3,3 +3,5 @@ atdp_subscription_data.psd1.old
 cert_gen_config.psd1
 test.ps1
 test-output-*
+*.req
+*.cer
