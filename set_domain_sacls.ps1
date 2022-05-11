@@ -9,6 +9,8 @@
 # Author: bbishop@covail.com / kmontgomery@gosecure.net
 # Date: 2022-05-11
 ###
+# NOTE: should be run from a domain-joined computer with RSAT tools installed, .NET framework 4.6.2+ by a user in the Domain Admins group.
+###
 
 #Requires -Version 4.0
 
