@@ -1,10 +1,10 @@
 ###
-# Copyright © 2021, Columbus Collaboratory LLC d/b/a Covail™ – All Rights Reserved
-#
-# This code is confidential Covail™ property.  This software and its code
-# may only be used by Covail™ for internal business purposes.
-# For more information consult the Covail™ Master Services Agreement and/or SOW
-# that governed the development of this software and code.
+## Copyright © 2022, GoSecure, Inc. – All Rights Reserved
+## 
+## This code is confidential GoSecure, Inc. property.  This software and its code
+## may only be used by GoSecure, Inc. for internal business purposes.
+## For more information consult the GoSecure, Inc. Master Services Agreement and/or SOW
+## that governed the development of this software and code.
  
 # Author: bbishop@covail.com / kmontgomery@gosecure.net
 # Date: 2022-05-11

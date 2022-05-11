@@ -8,7 +8,7 @@
 ###
 ## Configure Windows Event Forwarding Policy
 ##
-## Author: kmontgomery@covail.com
+## Author: kmontgomery@gosecure.net
 ## Date: 2021-03-26
 ###
 
