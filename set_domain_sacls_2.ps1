@@ -1,6 +1,6 @@
 ###
 # Copyright © 2021, Columbus Collaboratory LLC d/b/a Covail™ – All Rights Reserved
- 
+#
 # This code is confidential Covail™ property.  This software and its code
 # may only be used by Covail™ for internal business purposes.
 # For more information consult the Covail™ Master Services Agreement and/or SOW
@@ -12,10 +12,17 @@
 
 #Requires -Version 4.0
 
+$NetFrameworkRelease = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full").Release
+
+if ($NetFrameworkRelease -lt 528040) {
+     Write-Warning "WARN: .NET Framework 4.8+ is not installed, this script will not run properly"
+     Exit 1
+}
+
 # SET THE ARGUMENTS
 $principal = Get-ADDomain | select -ExpandProperty distinguishedname
 $flags = 'Success','Failure';
-$AuditGroup =  'Domain Users' #'Guest' #"Domain Users"; # NOTE: THIS ARGUMENT CAN BE CHANGED TO 'Domain Uesrs' SO THAT ACEs ARE WRITTEN AND APPLIED
+$AuditGroup =  'Guest' #'Guest' #"Domain Users"; # NOTE: THIS ARGUMENT CAN BE CHANGED TO 'Domain Uesrs' SO THAT ACEs ARE WRITTEN AND APPLIED
 $remove = $false
   
 # REMOVE ALL AUDIT SACLS FROM DOMAIN!!!!!
@@ -27,28 +34,6 @@ $acl.GetAuditRules($False, $True, [System.Security.Principal.SecurityIdentifier]
 Set-Acl -Path AD:\$principal $acl
 $acl = Get-Acl -Path AD:\$principal -Audit;
  
-# SETTING SACLs FOR DCSYNC REPLICATION EXTENDED RIGHTS
-$adright = 'ExtendedRight'
-$ds_rep_get_changes_guid = [guid]"1131f6aa-9c07-11d1-f79f-00c04fc2dcd2";
-$ds_rep_get_changes_all_guid = [guid]"1131f6ad-9c07-11d1-f79f-00c04fc2dcd2";
-$ds_rep_get_changes_filtered_set_guid = [guid]"89e95b76-444d-4c62-991a-0facbeda640c";
-$rights_guids = $ds_rep_get_changes_guid, $ds_rep_get_changes_all_guid, $ds_rep_get_changes_filtered_set_guid;
-  
-foreach($rightguid in $rights_guids){
-    $appliesTo = [Security.principal.NTAccount]$AuditGroup;
-    $auditFlags = [System.Security.AccessControl.AuditFlags]$flags;
-    $objectType = [guid]$rightguid;
-    $inheritanceType = [System.DirectoryServices.ActiveDirectorySecurityInheritance]'All';
-    $inheritedObjectType = [guid]'00000000-0000-0000-0000-000000000000';
-    $ace = New-Object System.directoryServices.ActiveDirectoryAuditRule($appliesTo, $rights, $auditFlags, $objectType, $inheritanceType, $inheritedObjectType);
-    if($remove) {
-        $acl.RemoveAuditRule($ace)
-    } else {
-        $acl.AddAuditRule($ace)
-    }
-    Set-Acl -Path AD:\$principal -AclObject $acl;
-}
-   
 # Property GUIDs
 $object_class = [guid]'bf9679e5-0de6-11d0-a285-00aa003049e2'
 $object_category = [guid]'26d97369-6070-11d1-a9c6-0000f80367c1'
@@ -71,8 +56,7 @@ $trust_partner = [guid]'bf967a5d-0de6-11d0-a285-00aa003049e2'
 $trust_type = [guid]'bf967a60-0de6-11d0-a285-00aa003049e2'
 $trust_attributes = [guid]'80a67e5a-9f22-11d0-afdd-00c04fd930c9'
 $null_guid = [guid]'00000000-0000-0000-0000-000000000000'
-  
- 
+
 # Class GUIDs
 # https://docs.microsoft.com/en-us/windows/win32/adschema/classes-all
 $user_class = [guid]'bf967aba-0de6-11d0-a285-00aa003049e2'
@@ -83,8 +67,29 @@ $trust_class = [guid]'bf967ab8-0de6-11d0-a285-00aa003049e2'
 $gpo_class = [guid]'f30e3bc2-9ff0-11d1-b603-0000f80367c1'
 $subnet_class = [guid]'b7b13124-b82e-11d0-afee-0000f80367c1'
 $site_class = [guid]'bf967ab3-0de6-11d0-a285-00aa003049e2'
- 
- 
+
+# SETTING SACLs FOR DCSYNC REPLICATION EXTENDED RIGHTS
+$adright = 'ExtendedRight'
+$ds_rep_get_changes_guid = [guid]"1131f6aa-9c07-11d1-f79f-00c04fc2dcd2";
+$ds_rep_get_changes_all_guid = [guid]"1131f6ad-9c07-11d1-f79f-00c04fc2dcd2";
+$ds_rep_get_changes_filtered_set_guid = [guid]"89e95b76-444d-4c62-991a-0facbeda640c";
+$rights_guids = $ds_rep_get_changes_guid, $ds_rep_get_changes_all_guid, $ds_rep_get_changes_filtered_set_guid;
+  
+foreach($rightguid in $rights_guids){
+    $appliesTo = [Security.principal.NTAccount]$AuditGroup;
+    $auditFlags = [System.Security.AccessControl.AuditFlags]$flags;
+    $objectType = [guid]$rightguid;
+    $inheritanceType = [System.DirectoryServices.ActiveDirectorySecurityInheritance]'All';
+    $inheritedObjectType = $null_guid;
+    $ace = New-Object System.directoryServices.ActiveDirectoryAuditRule($appliesTo, $rights, $auditFlags, $objectType, $inheritanceType, $inheritedObjectType);
+    if($remove) {
+        $acl.RemoveAuditRule($ace)
+    } else {
+        $acl.AddAuditRule($ace)
+    }
+    Set-Acl -Path AD:\$principal -AclObject $acl;
+}
+
 # SETTING SACL FOR NT-SECURITY-DESCRIPTOR READS
 $appliesTo = [Security.principal.NTAccount]$AuditGroup;
 $rights = [System.DirectoryServices.ActiveDirectoryRights]'ReadControl'
@@ -126,6 +131,7 @@ foreach($property_guid in $properties){
     }
     Set-Acl -Path AD:\$principal -AclObject $acl;
 }
+
 <#
 #set SACL for lastlogon write
 $acl = Get-Acl -Path AD:\$principal -Audit;
