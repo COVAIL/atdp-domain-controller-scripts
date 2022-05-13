@@ -33,12 +33,12 @@ $Flag = $true #$true results in ACEs being added, $false results in ACEs being r
  
  
 ## REMOVE ALL AUDIT SACLS FROM DOMAIN!!!!!
-$acl = Get-Acl -Path AD:\$principal -Audit;
-$acl.GetAuditRules($True, $True, [System.Security.Principal.SecurityIdentifier]) | Foreach-Object { $acl.RemoveAuditRule($_); }
-Set-Acl -Path AD:\$principal -AclObject $acl
-$acl = Get-Acl -Path AD:\$principal2 -Audit;
-$acl.GetAuditRules($True, $True, [System.Security.Principal.SecurityIdentifier]) | Foreach-Object { $acl.RemoveAuditRule($_); }
-Set-Acl -Path AD:\$principal2 -AclObject $acl
+# $acl = Get-Acl -Path AD:\$principal -Audit;
+# $acl.GetAuditRules($True, $True, [System.Security.Principal.SecurityIdentifier]) | Foreach-Object { $acl.RemoveAuditRule($_); }
+# Set-Acl -Path AD:\$principal -AclObject $acl
+# $acl = Get-Acl -Path AD:\$principal2 -Audit;
+# $acl.GetAuditRules($True, $True, [System.Security.Principal.SecurityIdentifier]) | Foreach-Object { $acl.RemoveAuditRule($_); }
+# Set-Acl -Path AD:\$principal2 -AclObject $acl
  
  
 ## FUNCTION TO ADD OR REMOVE SACLS
