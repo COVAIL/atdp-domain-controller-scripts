@@ -81,6 +81,34 @@ function Test-SslProtocol {
 } # function Test-SslProtocol
 
 
+function Configure-DomainControllerAuditGroupPolicy {
+  [CmdletBinding()]
+  [OutputType([Boolean])]
+  param()
+
+  $domain_controller_audit_policy_name = "GoSecure ADS DC Logging / Audit Policy"
+
+  $dc_policy = (Get-Gpo -name $domain_controller_audit_policy_name) 2>$null
+
+  if (! $dc_policy) {
+    Write-Host "INFO: Policy ${domain_controller_audit_policy_name} does not yet exist, creating new policy..."
+    # Clear the error variable so we can tell if the next command fails or not.
+    $Error.Clear()
+    ($dc_policy = New-Gpo -Name "${domain_controller_audit_policy_name}" -Comment 'GoSecure Attack Detector Platform - Windows Audit / Logging Policy for Domain Controllers') | Out-Null
+    if ($Error.Count -gt 0) {
+      $m = $Error[-1].Exception.Message
+      Write-Error "ERROR: Could not create policy ${domain_controller_audit_policy_name}: ${m}."
+      return $false
+    }
+  }
+  else {
+    Write-Host "INFO: Policy ${domain_controller_audit_policy_name} exists!"
+  }
+
+
+}
+
+
 function Configure-DomainControllerEventFowarding {
   [CmdletBinding()]
   [OutputType([Boolean])]
