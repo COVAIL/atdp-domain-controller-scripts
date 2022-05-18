@@ -107,7 +107,7 @@ function Configure-DomainControllerAuditGroupPolicy {
   else {
     Write-Host "INFO: Policy ${domain_controller_audit_policy_name} exists!"
     if (-Not $Force.IsPresent) {
-      $cont = Read-Host "  Are you sure you want to proceed? "
+      $cont = Read-Host "  Are you sure you want to proceed? (yes/no) # "
       if (-Not (($cont.ToLower() -eq "yes") -or ($cont.ToLower() -eq "y"))) {
         return $false
       }
@@ -162,6 +162,26 @@ function Configure-DomainControllerAuditGroupPolicy {
   }
 
   Write-Host "INFO: $domain_controller_audit_policy_name was imported."
+
+  $apply = Read-Host "Would you like to apply this policy to your domain controllers? (yes/no) # "
+  if (($apply.ToLower() -eq "yes") -or ($apply.ToLower() -eq "y")) {
+    $ou = "ou=Domain Controllers,$ad_dn"
+    # Check for link
+    $LinkCount = (((Get-GPInheritance -Target "${ou}").GpoLinks | Where-Object { $_.DisplayName -eq "$domain_controller_audit_policy_name" }).Length)
+
+    if ($LinkCount -lt 1) {
+      try {
+        Write-Host "INFO: linking ${domain_controller_audit_policy_name} to ${ou}..."
+        ($link = New-GPLink -Name "$domain_controller_audit_policy_name" -Target "${ou}" -Enforced Yes) | Out-Null
+      }
+      catch {
+        Write-Error "Could not create GPO Link: $_"
+      }
+    } else {
+      Write-Host "INFO: ${domain_controller_audit_policy_name} is already linked at ${ou}.."
+    }
+  }
+
   return $true
 }
 
