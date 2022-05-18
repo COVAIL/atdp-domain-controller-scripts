@@ -1,5 +1,6 @@
 atdp_subscription_data.psd1
 atdp_subscription_data.psd1.old
+gpo_tmp/
 cert_gen_config.psd1
 test.ps1
 test-output-*
