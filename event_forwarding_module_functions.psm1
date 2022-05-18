@@ -91,95 +91,101 @@ function Configure-DomainControllerAuditGroupPolicy {
 
   $domain_controller_audit_policy_name = "GoSecure ADS DC Logging / Audit Policy"
 
-  $dc_policy = (Get-Gpo -name $domain_controller_audit_policy_name) 2>$null
+  try {
+    $dc_policy = (Get-Gpo -name $domain_controller_audit_policy_name) 2>$null
 
-  if (! $dc_policy) {
-    Write-Host "INFO: Policy ${domain_controller_audit_policy_name} does not yet exist, creating new policy..."
-    # Clear the error variable so we can tell if the next command fails or not.
-    $Error.Clear()
-    ($dc_policy = New-Gpo -Name "${domain_controller_audit_policy_name}" -Comment 'GoSecure Attack Detector Platform - Windows Audit / Logging Policy for Domain Controllers') | Out-Null
-    if ($Error.Count -gt 0) {
-      $m = $Error[-1].Exception.Message
-      Write-Error "ERROR: Could not create policy ${domain_controller_audit_policy_name}: ${m}."
-      return $false
-    }
-  }
-  else {
-    Write-Host "INFO: Policy ${domain_controller_audit_policy_name} exists!"
-    if (-Not $Force.IsPresent) {
-      $cont = Read-Host "  Are you sure you want to proceed? (yes/no) # "
-      if (-Not (($cont.ToLower() -eq "yes") -or ($cont.ToLower() -eq "y"))) {
+    if (! $dc_policy) {
+      Write-Host "INFO: Policy ${domain_controller_audit_policy_name} does not yet exist, creating new policy..."
+      # Clear the error variable so we can tell if the next command fails or not.
+      $Error.Clear()
+      ($dc_policy = New-Gpo -Name "${domain_controller_audit_policy_name}" -Comment 'GoSecure Attack Detector Platform - Windows Audit / Logging Policy for Domain Controllers') | Out-Null
+      if ($Error.Count -gt 0) {
+        $m = $Error[-1].Exception.Message
+        Write-Error "ERROR: Could not create policy ${domain_controller_audit_policy_name}: ${m}."
         return $false
       }
     }
-  }
-
-  $ad_domain = Get-ADDomain
-  $ad_dn = $ad_domain.DistinguishedName
-  $ad_pdc_emulator = $ad_domain.PDCEmulator
-  $ad_full_dns_root = $ad_domain.DNSRoot
-  $ad_netbios = $ad_domain.NetBIOSName
-
-  try {
-    Write-Host "INFO: Cleaning up gpo temporary directory"
-    Remove-Item -Path "$PSScriptRoot\gpo_tmp" -Recurse -Force 2>$null | Out-Null
-    New-Item -Type Directory -Path "$PSScriptRoot\gpo_tmp" | Out-Null
-    Copy-Item -Path "$PSScriptRoot\gpo" -Destination "$PSScriptRoot\gpo_tmp" -Recurse -Force | Out-Null
-
-    Write-Host "Updating GPO Backup for policy $domain_controller_audit_policy_name with $ad_dn information..."
-    Get-ChildItem -Path "$PSScriptRoot\gpo_tmp" -Recurse | Foreach-Object {
-      $rpath = $($_.FullName | Resolve-Path -Relative);
-      if (Test-Path -Path "$rpath" -PathType leaf) {
-        Write-Host "  Working on $rpath..."
-        (Get-Content ${rpath}) |  Foreach-Object {
-          $_  -replace "@AD_DN@","$ad_dn" `
-              -replace "@AD_PDC_EMULATOR@","$ad_pdc_emulator" `
-              -replace "@AD_FULL_DNS_ROOT@","$ad_full_dns_root" `
-              -replace "@AD_NETBIOS@","$ad_netbios"
-        } | Set-Content $rpath
+    else {
+      Write-Host "INFO: Policy ${domain_controller_audit_policy_name} exists!"
+      if (-Not $Force.IsPresent) {
+        $cont = Read-Host "  Are you sure you want to proceed? (yes/no) # "
+        if (-Not (($cont.ToLower() -eq "yes") -or ($cont.ToLower() -eq "y"))) {
+          return $false
+        }
       }
     }
 
-    $manifest_path = "$PSScriptRoot\gpo_tmp\gpo\manifest.xml"
-    if (-Not (Test-Path $manifest_path)) {
-      Write-Error "GPO Backup Manifest was unavailable at $PSScriptRoot\gpo_tmp_gpo\manifest.xml"
-      return $false
-    }
+    $ad_domain = Get-ADDomain
+    $ad_dn = $ad_domain.DistinguishedName
+    $ad_pdc_emulator = $ad_domain.PDCEmulator
+    $ad_full_dns_root = $ad_domain.DNSRoot
+    $ad_netbios = $ad_domain.NetBIOSName
 
     try {
-      [xml]$backup_xml = Get-Content $manifest_path
-      Write-Host "INFO: The new GPO has been prepared for the $ad_dn domain, importing the new policy..."
-      $bkpid = $backup_xml.Backups.BackupInst.ID."#cdata-section"
-      Import-GPO -CreateIfNeeded -BackupId $bkpid -Path "$PSScriptRoot\gpo_tmp\gpo\" -TargetName "$domain_controller_audit_policy_name"
-    }
-    catch {
-      Write-Error "Could not import GPO $domain_controller_audit_policy_name."
-      return $false
-    }
-  }
-  finally {
-    $out = (Remove-Item "$PSScriptRoot\gpo_tmp" -Recurse -Force 2>$null | Out-Null)
-  }
+      Write-Host "INFO: Cleaning up gpo temporary directory"
+      Remove-Item -Path "$PSScriptRoot\gpo_tmp" -Recurse -Force 2>$null | Out-Null
+      New-Item -Type Directory -Path "$PSScriptRoot\gpo_tmp" | Out-Null
+      Copy-Item -Path "$PSScriptRoot\gpo" -Destination "$PSScriptRoot\gpo_tmp" -Recurse -Force | Out-Null
 
-  Write-Host "INFO: $domain_controller_audit_policy_name was imported."
+      Write-Host "Updating GPO Backup for policy $domain_controller_audit_policy_name with $ad_dn information..."
+      Get-ChildItem -Path "$PSScriptRoot\gpo_tmp" -Recurse | Foreach-Object {
+        $rpath = $($_.FullName | Resolve-Path -Relative);
+        if (Test-Path -Path "$rpath" -PathType leaf) {
+          Write-Host "  Working on $rpath..."
+          (Get-Content ${rpath}) |  Foreach-Object {
+            $_  -replace "@AD_DN@","$ad_dn" `
+                -replace "@AD_PDC_EMULATOR@","$ad_pdc_emulator" `
+                -replace "@AD_FULL_DNS_ROOT@","$ad_full_dns_root" `
+                -replace "@AD_NETBIOS@","$ad_netbios"
+          } | Set-Content $rpath
+        }
+      }
 
-  $apply = Read-Host "Would you like to apply this policy to your domain controllers? (yes/no) # "
-  if (($apply.ToLower() -eq "yes") -or ($apply.ToLower() -eq "y")) {
-    $ou = "ou=Domain Controllers,$ad_dn"
-    # Check for link
-    $LinkCount = (((Get-GPInheritance -Target "${ou}").GpoLinks | Where-Object { $_.DisplayName -eq "$domain_controller_audit_policy_name" }).Length)
+      $manifest_path = "$PSScriptRoot\gpo_tmp\gpo\manifest.xml"
+      if (-Not (Test-Path $manifest_path)) {
+        Write-Error "GPO Backup Manifest was unavailable at $PSScriptRoot\gpo_tmp_gpo\manifest.xml"
+        return $false
+      }
 
-    if ($LinkCount -lt 1) {
       try {
-        Write-Host "INFO: linking ${domain_controller_audit_policy_name} to ${ou}..."
-        ($link = New-GPLink -Name "$domain_controller_audit_policy_name" -Target "${ou}" -Enforced Yes) | Out-Null
+        [xml]$backup_xml = Get-Content $manifest_path
+        Write-Host "INFO: The new GPO has been prepared for the $ad_dn domain, importing the new policy..."
+        $bkpid = $backup_xml.Backups.BackupInst.ID."#cdata-section"
+        Import-GPO -CreateIfNeeded -BackupId $bkpid -Path "$PSScriptRoot\gpo_tmp\gpo\" -TargetName "$domain_controller_audit_policy_name"
       }
       catch {
-        Write-Error "Could not create GPO Link: $_"
+        Write-Error "Could not import GPO $domain_controller_audit_policy_name."
+        return $false
       }
-    } else {
-      Write-Host "INFO: ${domain_controller_audit_policy_name} is already linked at ${ou}.."
     }
+    finally {
+      $out = (Remove-Item "$PSScriptRoot\gpo_tmp" -Recurse -Force 2>$null | Out-Null)
+    }
+
+    Write-Host "INFO: $domain_controller_audit_policy_name was imported."
+
+    $apply = Read-Host "Would you like to apply this policy to your domain controllers? (yes/no) # "
+    if (($apply.ToLower() -eq "yes") -or ($apply.ToLower() -eq "y")) {
+      $ou = "ou=Domain Controllers,$ad_dn"
+      # Check for link
+      $LinkCount = (((Get-GPInheritance -Target "${ou}").GpoLinks | Where-Object { $_.DisplayName -eq "$domain_controller_audit_policy_name" }).Length)
+
+      if ($LinkCount -lt 1) {
+        try {
+          Write-Host "INFO: linking ${domain_controller_audit_policy_name} to ${ou}..."
+          ($link = New-GPLink -Name "$domain_controller_audit_policy_name" -Target "${ou}" -Enforced Yes) | Out-Null
+        }
+        catch {
+          Write-Error "Could not create GPO Link: $_"
+        }
+      } else {
+        Write-Host "INFO: ${domain_controller_audit_policy_name} is already linked at ${ou}.."
+      }
+    }
+  }
+  catch {
+    Write-Error "Unexpected condition: $_"
+    return $false
   }
 
   return $true
