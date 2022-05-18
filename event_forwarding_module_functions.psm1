@@ -84,7 +84,10 @@ function Test-SslProtocol {
 function Configure-DomainControllerAuditGroupPolicy {
   [CmdletBinding()]
   [OutputType([Boolean])]
-  param()
+  param(
+    [Parameter(Mandatory=$false)]
+    [switch] $Force
+  )
 
   $domain_controller_audit_policy_name = "GoSecure ADS DC Logging / Audit Policy"
 
@@ -103,9 +106,63 @@ function Configure-DomainControllerAuditGroupPolicy {
   }
   else {
     Write-Host "INFO: Policy ${domain_controller_audit_policy_name} exists!"
+    if (-Not $Force.IsPresent) {
+      $cont = Read-Host "  Are you sure you want to proceed? "
+      if (-Not (($cont.ToLower() -eq "yes") -or ($cont.ToLower() -eq "y"))) {
+        return $false
+      }
+    }
   }
 
+  $ad_domain = Get-ADDomain
+  $ad_dn = $ad_domain.DistinguishedName
+  $ad_pdc_emulator = $ad_domain.PDCEmulator
+  $ad_full_dns_root = $ad_domain.DNSRoot
+  $ad_netbios = $ad_domain.NetBIOSName
 
+  try {
+    Write-Host "INFO: Cleaning up gpo temporary directory"
+    Remove-Item -Path "$PSScriptRoot\gpo_tmp" -Recurse -Force 2>$null | Out-Null
+    New-Item -Type Directory -Path "$PSScriptRoot\gpo_tmp" | Out-Null
+    Copy-Item -Path "$PSScriptRoot\gpo" -Destination "$PSScriptRoot\gpo_tmp" -Recurse -Force | Out-Null
+
+    Write-Host "Updating GPO Backup for policy $domain_controller_audit_policy_name with $ad_dn information..."
+    Get-ChildItem -Path "$PSScriptRoot\gpo_tmp" -Recurse | Foreach-Object {
+      $rpath = $($_.FullName | Resolve-Path -Relative);
+      if (Test-Path -Path "$rpath" -PathType leaf) {
+        Write-Host "  Working on $rpath..."
+        (Get-Content ${rpath}) |  Foreach-Object {
+          $_  -replace "@AD_DN@","$ad_dn" `
+              -replace "@AD_PDC_EMULATOR@","$ad_pdc_emulator" `
+              -replace "@AD_FULL_DNS_ROOT@","$ad_full_dns_root" `
+              -replace "@AD_NETBIOS@","$ad_netbios"
+        } | Set-Content $rpath
+      }
+    }
+
+    $manifest_path = "$PSScriptRoot\gpo_tmp\gpo\manifest.xml"
+    if (-Not (Test-Path $manifest_path)) {
+      Write-Error "GPO Backup Manifest was unavailable at $PSScriptRoot\gpo_tmp_gpo\manifest.xml"
+      return $false
+    }
+
+    try {
+      [xml]$backup_xml = Get-Content $manifest_path
+      Write-Host "INFO: The new GPO has been prepared for the $ad_dn domain, importing the new policy..."
+      $bkpid = $backup_xml.Backups.BackupInst.ID."#cdata-section"
+      Import-GPO -CreateIfNeeded -BackupId $bkpid -Path "$PSScriptRoot\gpo_tmp\gpo\" -TargetName "$domain_controller_audit_policy_name"
+    }
+    catch {
+      Write-Error "Could not import GPO $domain_controller_audit_policy_name."
+      return $false
+    }
+  }
+  finally {
+    $out = (Remove-Item "$PSScriptRoot\gpo_tmp" -Recurse -Force 2>$null | Out-Null)
+  }
+
+  Write-Host "INFO: $domain_controller_audit_policy_name was imported."
+  return $true
 }
 
 
