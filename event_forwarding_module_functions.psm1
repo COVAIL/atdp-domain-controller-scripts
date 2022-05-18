@@ -1,14 +1,14 @@
 ###
-## Copyright © 2021, Columbus Collaboratory LLC d/b/a Covail™ – All Rights Reserved
+## Copyright © 2022, GoSecure, Inc. – All Rights Reserved
 ## 
-## This code is confidential Covail™ property.  This software and its code
-## may only be used by Covail™ for internal business purposes.
-## For more information consult the Covail™ Master Services Agreement and/or SOW
+## This code is confidential GoSecure, Inc. property.  This software and its code
+## may only be used by GoSecure, Inc. for internal business purposes.
+## For more information consult the GoSecure, Inc. Master Services Agreement and/or SOW
 ## that governed the development of this software and code.
 ###
 ## Module functions for configure_windows_event_formwarding.ps1 script
 ##
-## Author: kmontgomery@covail.com
+## Author: kmontgomery@gosecure.net
 ## Date: 2021-06-18
 ###
 
@@ -197,7 +197,7 @@ function Configure-DomainControllerEventFowarding {
     Write-Host "INFO: Policy ${domain_controller_policy_name} does not yet exist, creating new policy..."
     # Clear the error variable so we can tell if the next command fails or not.
     $Error.Clear()
-    ($dc_policy = New-Gpo -Name "${domain_controller_policy_name}" -Comment 'Windows Event Forwarding Policy for Domain Controllers for the COVAIL Attack Detector Platform') | Out-Null
+    ($dc_policy = New-Gpo -Name "${domain_controller_policy_name}" -Comment 'Windows Event Forwarding Policy for Domain Controllers for the GoSecure Attack Detector Platform') | Out-Null
     if ($Error.Count -gt 0) {
       $m = $Error[-1].Exception.Message
       Write-Error "ERROR: Could not create policy ${domain_controller_policy_name}: ${m}."
@@ -292,7 +292,7 @@ function Configure-ScriptData {
   do {
     $default_val = $Config.WEC_Server_FQDN
     $default_str = if ($default_val) { " (default: ${default_val})" } else { "" }
-    $user_input = Read-Host -Prompt "Please provide the WEC hostname that was provided by COVAIL${default_str}"
+    $user_input = Read-Host -Prompt "Please provide the WEC hostname that was provided by GoSecure${default_str}"
     if ([string]::IsNullOrEmpty($user_input)) { $user_input = $default_val }
   } while ([string]::IsNullOrEmpty($user_input))
 
