@@ -24,5 +24,7 @@ NOTE: running either `configure_windows_event_forwarding.ps1` or `test_wec_conne
 
 ## Setting Domain SACLs and Proper Audit Policy for Detectors
 
+Note: these scripts should be applied to the domain, they set up audit policy and SACLs that generate the type of audit messages required for several of our detectors to run.  They should be run from a machine in the domain that have the Remote Server Administration Tools and Group Policy Management features installed, and have access to the domain controllers.  The order of running these scripts is not important.
+
 * `apply_domain_audit_gpo.ps1` - configure the domain audit GPO
 * `set_domain_sacls.ps1` - sets the domain SACLs on all objects required for proper audit record events to be generated that the detectors look for
